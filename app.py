@@ -69,7 +69,6 @@ def create_data():
 
 if __name__ == '__main__':
     with app.app_context():
-        db.drop_all()
         db.create_all()
         if not User.query.filter_by(login='admin_py').first():
             user = User(login='admin_py')
