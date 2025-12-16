@@ -15,6 +15,20 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY')
 db.init_app(app)
 
+@app.before_request
+def check_jwt():
+    if request.path.startswith('/api/'):
+        auth = request.headers.get('Authorization')
+        if not auth or not auth.startswith('Bearer '):
+            return jsonify({"error": "Token required"}), 401
+        token = auth.split(' ')[1]
+        try:
+            jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        except jwt.ExpiredSignatureError:
+            return jsonify({"error": "Token expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"error": "Invalid token"}), 401
+
 
 @app.route('/auth/login', methods=['POST'])
 def login():
@@ -33,43 +47,25 @@ def login():
 
 @app.route('/api/data', methods=['GET'])
 def get_data():
-    barier = request.headers.get('Authorization')
-    token = barier.split(' ')[1]
-    if not token:
-        return jsonify({"error": "Token required"}), 401
-    try:
-        decode = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
-        posts = Post.query.all()
-        return jsonify([{'id': p.id, 'title': p.title, 'content': p.content, 'user_id': p.user_id} for p in posts])
-    except jwt.ExpiredSignatureError:
-        return jsonify({"error": "Token expired"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"error": "Invalid token"}), 401
+    posts = Post.query.all()
+    return jsonify([{'id': p.id, 'title': p.title, 'content': p.content, 'user_id': p.user_id} for p in posts])
 
 @app.route('/api/data', methods=['POST'])
-# @jwt_required()
 def create_data():
-    barier = request.headers.get('Authorization')
-    token = barier.split(' ')[1]
-    if not token:
-        return jsonify({"error": "Token required"}), 401
-    try:
-        decode = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+    auth = request.headers.get('Authorization')
+    token = auth.split(' ')[1]
+    decode = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
 
-        data = request.get_json()
-        usr_title = html.escape(data.get('title'))
-        usr_content = html.escape(data.get('content'))
+    data = request.get_json()
+    usr_title = html.escape(data.get('title'))
+    usr_content = html.escape(data.get('content'))
 
-        user_id = User.query.filter_by(login = decode['user']).first().id
-        
-        post = Post(title=usr_title, content=usr_content, user_id=user_id)
-        db.session.add(post)
-        db.session.commit()
-        return jsonify({'id': post.id}), 201
-    except jwt.ExpiredSignatureError:
-        return jsonify({"error": "Token expired"}), 401
-    except jwt.InvalidTokenError:
-        return jsonify({"error": "Invalid token"}), 401
+    user_id = User.query.filter_by(login = decode['user']).first().id
+    
+    post = Post(title=usr_title, content=usr_content, user_id=user_id)
+    db.session.add(post)
+    db.session.commit()
+    return jsonify({'id': post.id}), 201
 
 if __name__ == '__main__':
     with app.app_context():
@@ -80,4 +76,4 @@ if __name__ == '__main__':
             user.set_password('password')
             db.session.add(user)
             db.session.commit()
-    app.run(debug=True)
+    app.run(debug=False, host='localhost', port=5000)
