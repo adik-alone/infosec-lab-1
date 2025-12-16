@@ -26,8 +26,8 @@ jobs:
 
     - name: Run Bandit (SAST)
       run: |
-        pip install bandit[toml]
-        bandit -r . --exclude-dir=.venv,.github -f json -o bandit-report.json || true
+        pip install bandit
+        bandit -r . -f json -o bandit-report.json || true
 
     - name: Run Safety (SCA)
       run: |
